@@ -6,13 +6,13 @@ import { AuthProvider } from "@/lib/auth-context";
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-body",
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
 const syne = Syne({
   subsets: ["latin"],
   variable: "--font-display",
-  weight: ["700", "800"],
+  weight: ["700", "800", "900"],
 });
 
 export const metadata: Metadata = {
