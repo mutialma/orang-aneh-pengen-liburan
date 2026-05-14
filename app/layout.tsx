@@ -6,17 +6,17 @@ import { AuthProvider } from "@/lib/auth-context";
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-body",
-  weight: ["400", "500", "600", "700", "800", "900"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 const syne = Syne({
   subsets: ["latin"],
   variable: "--font-display",
-  weight: ["700", "800", "900"],
+  weight: ["700", "800"],
 });
 
 export const metadata: Metadata = {
-  title: "LiburanPintar — AI Travel Planner Indonesia",
+  title: "Plenger — Perencana Liburan Efisien melalui Navigasi Graph dan Evaluasi Rute.",
   description:
     "Platform perencanaan liburan berbasis AI untuk wisatawan Indonesia. Cari destinasi terbaik sesuai budget dan preferensimu.",
 };

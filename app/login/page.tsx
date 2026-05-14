@@ -28,27 +28,43 @@ function LoginPageInner() {
   }, [user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
-    setLoading(true);
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
+  try {
     if (tab === "login") {
-      const ok = await login(email, password);
-      if (ok) {
+      const success = await login(email, password);
+      if (success) {
         setSuccess("Berhasil masuk! Mengalihkan...");
-        setTimeout(() => router.push("/dashboard"), 800);
+        router.push("/dashboard");
       } else {
-        setError("Email atau password salah. Coba: andi@demo.com / demo123");
+        setError("Email atau password salah.");
       }
     } else {
-      if (!name.trim()) { setError("Nama wajib diisi."); setLoading(false); return; }
-      await register(name, email, password);
-      setSuccess("Akun berhasil dibuat! Mengalihkan...");
-      setTimeout(() => router.push("/dashboard"), 800);
+      // Untuk Register
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
+      
+      const data = await res.json();
+
+      if (res.ok) {
+        setSuccess("Akun berhasil dibuat! Silakan login.");
+        setTab("login"); // Pindahkan ke tab login setelah daftar
+      } else {
+        // TAMPILKAN ERROR ASLI DARI DATABASE/PRISMA
+        setError(data.error || "Gagal mendaftar.");
+      }
     }
+  } catch (err) {
+    setError("Terjadi gangguan koneksi ke server.");
+  } finally {
     setLoading(false);
-  };
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50 flex flex-col">

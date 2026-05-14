@@ -12,12 +12,11 @@ export default function Footer() {
                 <Compass size={16} className="text-white" />
               </div>
               <span className="font-display text-xl font-black">
-                Liburan<span className="text-sky-400">Pintar</span>
+                Ple<span className="text-sky-400">nger</span>
               </span>
             </div>
             <p className="text-gray-400 text-sm leading-relaxed mb-4">
-              Platform perencanaan liburan berbasis AI untuk wisatawan Indonesia.
-              Cari destinasi terbaik sesuai budget dan preferensimu.
+              Perencana Liburan Efisien melalui Navigasi Graph dan Evaluasi Rute.
             </p>
             <Link
               href="/login?tab=register"

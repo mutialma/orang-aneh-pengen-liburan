@@ -34,7 +34,7 @@ export default function Navbar() {
             <Compass size={16} className="text-white" />
           </div>
           <span className="font-display font-black text-lg text-gray-900">
-            Liburan<span className="gradient-text">Pintar</span>
+            Ple<span className="gradient-text">nger</span>
           </span>
         </Link>
 
