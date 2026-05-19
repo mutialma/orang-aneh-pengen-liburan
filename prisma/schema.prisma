@@ -14,3 +14,11 @@ model User {
   password  String
   createdAt DateTime @default(now())
 }
+
+model DestinationClick {
+  id            String   @id @default(uuid())
+  destinationId String   @unique // Menyimpan ID hotel dari API (dest_id)
+  destinationName String
+  clickCount    Int      @default(1)
+  updatedAt     DateTime @updatedAt
+}

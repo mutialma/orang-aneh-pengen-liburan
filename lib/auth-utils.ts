@@ -44,5 +44,5 @@ export const authUtils = {
     // Format: email|signature (Email untuk identitas, signature untuk validasi)
     return `${email}|${signature}`;
   }
-
+  
 };
