@@ -9,7 +9,7 @@ import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { Badge, Stars, SkeletonCard, DestCard } from "@/components/ui/cards";
-import { filterDestinations, fmt, parseItineraryDays } from "@/lib/utils";
+import { filterDestinations, fmt, parseItineraryDays, getItineraryForDuration } from "@/lib/utils";
 import { PREFERENCES, DURATIONS, savingTips, upgradeTips } from "@/data/destinations";
 
 const PREF_ICONS: Record<string, React.FC<{ size?: number; className?: string }>> = {
@@ -21,7 +21,6 @@ const PREF_ICONS: Record<string, React.FC<{ size?: number; className?: string }>
 export default function PlannerPage() {
   const [budget, setBudget] = useState(1500000);
   const [budgetInput, setBudgetInput] = useState("1500000");
-  const [originCity, setOriginCity] = useState("Surabaya");
   const [budgetCategory, setBudgetCategory] = useState("standar");
   const [preferences, setPreferences] = useState<string[]>([]);
   const [duration, setDuration] = useState("2D1N");
@@ -43,56 +42,22 @@ export default function PlannerPage() {
     setBudgetInput(String(budgetPresets[cat]));
   };
 
-  // Di dalam komponen PlannerPage di planner/page.tsx
-
-  const handleSearch = async () => {
+  const handleSearch = () => {
     setLoading(true);
     setResults(null);
-    
-    try {
-      // Tembak ke backend lokal yang akan memanggil API pihak ketiga
-      const response = await fetch("/api/generate-itinerary", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          budget: budget,
-          duration: duration,
-          preferences: preferences,
-          originCity: originCity,
-        }),
-      });
-
-      const resData = await response.json();
-
-      if (response.ok && resData.success) {
-        setResults(resData.data);
-        setActiveTab("terbaik");
-        setItineraryOpen(false);
-        // Scroll otomatis ke hasil
-        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-      } else {
-        alert(resData.error || "Terjadi kesalahan saat mencari destinasi.");
-      }
-    } catch (error) {
-      console.error("Gagal mengambil data:", error);
-      alert("Koneksi bermasalah. Coba lagi nyahh!");
-    } finally {
+    setTimeout(() => {
+      const r = filterDestinations(budget, preferences, duration);
+      setResults(r);
       setLoading(false);
-    }
+      setActiveTab("terbaik");
+      setItineraryOpen(false);
+      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    }, 1600);
   };
 
-  // 1. Ambil jumlah hari maksimal dari state duration (contoh: "2D1N" -> angka 2)
-  const maxDays = parseInt(duration.charAt(0)) || 1;
-
-  // 2. Ambil raw data dari backend
-  const rawItinerary = results 
-    ? (results.main.itinerary[results.durationKey] || results.main.itinerary[duration] || results.main.itinerary["2D1N"] || [])
-    : [];
-
-  // 3. Parse dan POTONG array sesuai maxDays agar tidak bablas
-  const itineraryDays = parseItineraryDays(rawItinerary).slice(0, maxDays);
+  const itineraryDays = results ? parseItineraryDays(
+    getItineraryForDuration(results.main, results.durationKey)
+  ) : [];
 
   const currentTabDests = results
     ? activeTab === "terbaik" ? results.alternatives
@@ -132,26 +97,6 @@ export default function PlannerPage() {
 
           <div className="p-6 space-y-6">
             {/* Budget */}
-            {/* Kota Asal */}
-<div>
-  <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3">
-    <Globe size={16} className="text-sky-500" /> Kota Asal Keberangkatan
-  </label>
-  <select
-    value={originCity}
-    onChange={(e) => setOriginCity(e.target.value)}
-    className="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 text-sm font-semibold text-gray-700 bg-white transition"
-  >
-    <option value="Jakarta">Jakarta (CGK)</option>
-    <option value="Surabaya">Surabaya (SUB)</option>
-    <option value="Medan">Medan (KNO)</option>
-    <option value="Bandung">Bandung (BDO)</option>
-    <option value="Yogyakarta">Yogyakarta (YIA)</option>
-    <option value="Makassar">Makassar (UPG)</option>
-  </select>
-</div>
-
-{/* Budget (Kode lama kamu ada di bawah sini) */}
             <div>
               <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3">
                 <Wallet size={16} className="text-sky-500" /> Budget Total Liburan
