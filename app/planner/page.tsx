@@ -31,7 +31,8 @@ export default function PlannerPage() {
   const [itineraryOpen, setItineraryOpen] = useState(false);
   const [activeDay, setActiveDay] = useState(0);
   const resultRef = useRef<HTMLDivElement>(null);
-
+  // Tambah state ini di atas, bareng state lainnya
+  const [budgetError, setBudgetError] = useState<{ message: string; suggestion: string; minBudget: number } | null>(null);
   const budgetPresets: Record<string, number> = { hemat: 500000, standar: 1500000, premium: 3500000 };
 
   const togglePref = (p: string) =>
@@ -46,42 +47,42 @@ export default function PlannerPage() {
   // Di dalam komponen PlannerPage di planner/page.tsx
 
   const handleSearch = async () => {
-    setLoading(true);
-    setResults(null);
-    
-    try {
-      // Tembak ke backend lokal yang akan memanggil API pihak ketiga
-      const response = await fetch("/api/generate-itinerary", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          budget: budget,
-          duration: duration,
-          preferences: preferences,
-          originCity: originCity,
-        }),
+  setLoading(true);
+  setResults(null);
+  setBudgetError(null); // ← reset error setiap kali search
+
+  try {
+    const response = await fetch("/api/generate-itinerary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ budget, duration, preferences, originCity }),
+    });
+
+    const resData = await response.json();
+
+    if (response.ok && resData.success) {
+      setResults(resData.data);
+      setActiveTab("terbaik");
+      setItineraryOpen(false);
+      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    } else if (resData.errorType === "BUDGET_TOO_LOW") {
+      // ← tangkap error budget khusus
+      setBudgetError({
+        message: resData.error,
+        suggestion: resData.suggestion,
+        minBudget: resData.minBudgetNeeded,
       });
-
-      const resData = await response.json();
-
-      if (response.ok && resData.success) {
-        setResults(resData.data);
-        setActiveTab("terbaik");
-        setItineraryOpen(false);
-        // Scroll otomatis ke hasil
-        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-      } else {
-        alert(resData.error || "Terjadi kesalahan saat mencari destinasi.");
-      }
-    } catch (error) {
-      console.error("Gagal mengambil data:", error);
-      alert("Koneksi bermasalah. Coba lagi nyahh!");
-    } finally {
-      setLoading(false);
+      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    } else {
+      alert(resData.error || "Terjadi kesalahan saat mencari destinasi.");
     }
-  };
+  } catch (error) {
+    console.error("Gagal mengambil data:", error);
+    alert("Koneksi bermasalah. Coba lagi nyahh!");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // 1. Ambil jumlah hari maksimal dari state duration (contoh: "2D1N" -> angka 2)
   const maxDays = parseInt(duration.charAt(0)) || 1;
@@ -456,6 +457,56 @@ export default function PlannerPage() {
           </section>
         </div>
       )}
+      {/* Budget Error */}
+{budgetError && !loading && (
+  <div ref={resultRef} className="px-4 pb-8 slide-in">
+    <div className="max-w-3xl mx-auto">
+      <div className="bg-white rounded-3xl shadow-xl border border-red-100 overflow-hidden">
+        <div className="bg-gradient-to-br from-red-50 to-orange-50 p-8 text-center">
+          <div className="text-5xl mb-4">😔</div>
+          <h3 className="font-display font-black text-xl text-gray-800 mb-2">
+            Budget Tidak Mencukupi
+          </h3>
+          <p className="text-gray-500 text-sm mb-6 max-w-md mx-auto">
+            {budgetError.message}
+          </p>
+
+          {/* Highlight minimum budget */}
+          <div className="bg-white rounded-2xl p-4 border border-red-100 inline-block mb-6">
+            <p className="text-xs text-gray-400 mb-1">Minimum budget yang dibutuhkan</p>
+            <p className="font-black text-2xl text-red-500">{fmt(budgetError.minBudget)}</p>
+          </div>
+
+          <p className="text-xs text-gray-400 mb-6">{budgetError.suggestion}</p>
+
+          {/* Tombol shortcut naikan budget */}
+          <div className="flex gap-3 justify-center flex-wrap">
+            <button
+              onClick={() => {
+                setBudget(budgetError.minBudget);
+                setBudgetInput(String(budgetError.minBudget));
+                setBudgetCategory("");
+                document.getElementById("planner")?.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="gradient-bg text-white font-black px-6 py-3 rounded-2xl text-sm hover:opacity-90 transition shadow-lg shadow-sky-200"
+            >
+              Pakai Budget {fmt(budgetError.minBudget)}
+            </button>
+            <button
+              onClick={() => {
+                document.getElementById("planner")?.scrollIntoView({ behavior: "smooth" });
+                setBudgetError(null);
+              }}
+              className="bg-gray-100 text-gray-600 font-bold px-6 py-3 rounded-2xl text-sm hover:bg-gray-200 transition"
+            >
+              Ubah Budget Manual
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
       <Footer />
 
@@ -470,4 +521,5 @@ export default function PlannerPage() {
       </div>
     </div>
   );
+  
 }

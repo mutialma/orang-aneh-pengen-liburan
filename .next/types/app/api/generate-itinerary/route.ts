@@ -1,8 +1,8 @@
 // File: H:\laragon\www\orang-aneh-pengen-liburan\app\api\generate-itinerary\route.ts
-import * as entry from '../../../../../app/api/generate-itinerary/route-bagus.js'
+import * as entry from '../../../../../app/api/generate-itinerary/route.js'
 import type { NextRequest } from 'next/server.js'
 
-type TEntry = typeof import('../../../../../app/api/generate-itinerary/route-bagus.js')
+type TEntry = typeof import('../../../../../app/api/generate-itinerary/route.js')
 
 // Check that the entry is a valid entry
 checkFields<Diff<{
