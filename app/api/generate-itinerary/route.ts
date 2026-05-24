@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
 
-// =========================================================================
-// REGISTRY DATABASE
-// =========================================================================
 const CITY_REGISTRY: Record<string, {
   lat: number; lon: number; province: string; iata: string;
   station: string; bookingId: string; destType: string; taLocationId: string
@@ -17,9 +14,7 @@ const CITY_REGISTRY: Record<string, {
   "Lombok":     { lat: -8.6529,  lon: 116.3249, province: "NTB",         iata: "LOP", station: "NONE", bookingId: "-2683072", destType: "region", taLocationId: "574872" },
 };
 
-// =========================================================================
-// UTILITIES
-// =========================================================================
+
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 function getTransportMode(distanceKm: number): { mode: string; icon: string; station: string; modeReturnIcon: string } {
@@ -60,9 +55,6 @@ async function fetchRealTransportPrice(
   }
 }
 
-// =========================================================================
-// TYPES
-// =========================================================================
 type NodePOI = {
   id: string; name: string; lat: number; lon: number;
   type: string; cost: number; icon: string;
@@ -78,9 +70,6 @@ interface BeamState {
   score: number;
 }
 
-// =========================================================================
-// TRIPADVISOR POI FETCH
-// =========================================================================
 async function fetchOpenTripMapPOIs(
   cityName: string,
   hotelLat: number,
@@ -141,18 +130,13 @@ async function fetchOpenTripMapPOIs(
   }
 }
 
-// =========================================================================
-// CORE ALGORITHMS
-// =========================================================================
 
-// MODUL 1 — Hash Indexing
 function formulaHash(str: string, M = 200): number {
   let sum = 0;
   for (let i = 0; i < str.length; i++) sum += str.charCodeAt(i) * (i + 1);
   return sum % M;
 }
 
-// Helper — Haversine Distance (km)
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R    = 6371;
   const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -163,12 +147,10 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 1.25;
 }
 
-// Helper — Haversine antara dua NodePOI
 function haversineKm(a: NodePOI, b: NodePOI): number {
   return haversineDistance(a.lat, a.lon, b.lat, b.lon);
 }
 
-// MODUL 3A — h(n): Fitness Score (sesuai gambar)
 function fitnessScore(
   poi: NodePOI,
   preferences: string[],
@@ -196,7 +178,6 @@ function fitnessScore(
   );
 }
 
-// MODUL 3B — Hard Constraints Filter (sesuai gambar)
 function passesConstraints(
   poi: NodePOI,
   state: BeamState,
@@ -205,15 +186,13 @@ function passesConstraints(
   dailyDistanceSoFar: number
 ): boolean {
   const currentHour = Math.floor(state.time / 60);
-  if (currentHour < (poi.openHour ?? 8))  return false;  // jam operasional
-  if (currentHour > (poi.closeHour ?? 21)) return false; // jam operasional
-  if (dailyDistanceSoFar + distanceFromLastKm > 50) return false; // maks 50 km/hari
-  if (withFamily && !poi.familyFriendly) return false;   // family filter
-  if (state.visited.has(poi.id)) return false;            // sudah dikunjungi
+  if (currentHour < (poi.openHour ?? 8))  return false; 
+  if (currentHour > (poi.closeHour ?? 21)) return false;
+  if (dailyDistanceSoFar + distanceFromLastKm > 50) return false;
+  if (withFamily && !poi.familyFriendly) return false;  
+  if (state.visited.has(poi.id)) return false;            
   return true;
 }
-
-// MODUL 3C — Beam Search per hari (sesuai gambar, beam width = 8)
 const BEAM_WIDTH = 8;
 
 function beamSearchDay(
@@ -243,13 +222,12 @@ function beamSearchDay(
         const distKm = haversineKm(state.location, poi);
         if (!passesConstraints(poi, state, withFamily, distKm, dailyDistanceSoFar)) continue;
 
-        const travelMinutes = (distKm / 40) * 60; // 40 km/h
-        const newTime       = state.time + travelMinutes + 90; // +90 menit kunjungan
-        const newBudget     = state.budgetUsed + poi.cost;    // g(n) kumulatif
+        const travelMinutes = (distKm / 40) * 60; 
+        const newTime       = state.time + travelMinutes + 90; 
+        const newBudget     = state.budgetUsed + poi.cost;   
 
         if (newBudget > dailyBudget) continue;
 
-        // f(n) = h(n) - normalized g(n)
         const h = fitnessScore(poi, preferences, dailyBudget, withFamily);
         const g = dailyBudget > 0 ? newBudget / dailyBudget : 0;
         const f = h - g;
@@ -280,7 +258,6 @@ function beamSearchDay(
   return result;
 }
 
-// MODUL 4 — Cosine Similarity
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
   let dot = 0, normA = 0, normB = 0;
   for (let i = 0; i < vecA.length; i++) {
@@ -291,9 +268,6 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
   return normA === 0 || normB === 0 ? 0 : dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-// =========================================================================
-// MAIN ROUTE HANDLER
-// =========================================================================
 export async function POST(req: Request) {
   console.log("\n================ MULAI GENERATE ITINERARY ================");
 
@@ -361,9 +335,6 @@ export async function POST(req: Request) {
       await delay(1000);
     }
 
-    // =====================================================================
-    // STEP 2 — Modul 1 & 2: Hash + Weighted Scoring
-    // =====================================================================
     const hashBuckets: Record<number, any[]> = {};
     rawAccommodations.forEach(item => {
       const bucket = formulaHash(item.name);
@@ -376,7 +347,6 @@ export async function POST(req: Request) {
     const prefArray = preferences ?? [];
     const w1 = 0.5, w2 = 0.3, w3 = 0.2;
 
-    // ✅ SESUDAH — pakai fungsi helper yang sama persis dengan perhitungan aktual
 function estimateTransportCost(distanceKm: number): number {
   if (distanceKm < 100)  return (150000 + distanceKm * 800) * 2;
   if (distanceKm <= 450) return (250000 + distanceKm * 400) * 2;
@@ -392,7 +362,6 @@ function estimateTotalCost(item: any, distanceKm: number, totalDays: number): nu
 }
 
 
-// Di scoredItems:
 const scoredItems = indexedItems.map(item => {
   const distance      = haversineDistance(origin.lat, origin.lon, item.lat, item.lon);
   const grandTotalEst = estimateTotalCost(item, distance, totalDays); // ← wajib ada fungsi ini
@@ -412,7 +381,6 @@ const scoredItems = indexedItems.map(item => {
   };
 });
 
-// Filter pakai grandTotalEst
 const affordableItems = scoredItems.filter(item => item.grandTotalEst <= budget);
 
 console.log("[DEBUG] Budget user:", budget);
@@ -421,7 +389,6 @@ console.log("[DEBUG] scoredItems grandTotalEst:", scoredItems.map(i => ({
 })));
 console.log("[DEBUG] affordableItems count:", affordableItems.length);
 
-// Kalau tidak ada satupun yang muat → tolak, kasih pesan ke user
 if (affordableItems.length === 0) {
   const cheapestOption = scoredItems.sort((a, b) => a.grandTotalEst - b.grandTotalEst)[0];
   const minBudgetNeeded = cheapestOption?.grandTotalEst ?? 0;
@@ -443,11 +410,6 @@ const primarySelection = affordableItems.sort((a, b) => b.finalScore - a.finalSc
     const foodCost      = Math.floor((150000 + primarySelection.costPerDay * 0.05) * totalDays);
     const ticketCost    = Math.floor((100000 + primarySelection.costPerDay * 0.05) * totalDays);
 
-    // =====================================================================
-    // STEP 3 — Modul 3: Fetch POI + Beam Search Itinerary
-    // =====================================================================
-
-    // ✅ Fetch POI dulu — ini yang sebelumnya hilang
     const realPOIs = await fetchOpenTripMapPOIs(
       primarySelection.city,
       primarySelection.lat,
@@ -455,7 +417,6 @@ const primarySelection = affordableItems.sort((a, b) => b.finalScore - a.finalSc
       prefArray
     );
 
-    // Node hotel sebagai titik start
     const hotelNode: NodePOI = {
       id:   "start",
       name: `Hotel: ${primarySelection.name}`,
@@ -472,12 +433,11 @@ const primarySelection = affordableItems.sort((a, b) => b.finalScore - a.finalSc
     };
 
     const dailyBudget  = Math.floor((budget - transportCost - hotelCost) / totalDays);
-    const maxActivitas = 3; // maks aktivitas per hari (hard constraint intensitas)
+    const maxActivitas = 3; 
 
     const actualItinerary: any[] = [];
 
     for (let day = 1; day <= totalDays; day++) {
-      // ✅ Beam search per hari — filter hard constraints sebelum eksplorasi
       const routeHari = beamSearchDay(
         hotelNode,
         realPOIs,
@@ -487,7 +447,6 @@ const primarySelection = affordableItems.sort((a, b) => b.finalScore - a.finalSc
         maxActivitas
       );
 
-      // Susun jadwal hari ini
       if (day === 1) {
         actualItinerary.push({
           time: "08:00", icon: transport.icon,
@@ -512,7 +471,6 @@ const primarySelection = affordableItems.sort((a, b) => b.finalScore - a.finalSc
         });
       }
 
-      // Ambil POI hasil beam search untuk hari ini
       const midActivity = routeHari[0] ?? realPOIs[0];
       const eveActivity = routeHari[1] ?? realPOIs[1] ?? midActivity;
 
@@ -546,7 +504,7 @@ const primarySelection = affordableItems.sort((a, b) => b.finalScore - a.finalSc
       id: d.id, name: d.name, city: d.city, province: d.province, image: d.icon,
       distanceLabel:  `${Math.round(d.distanceKm)} km (${Math.round(d.similarityScore * 100)}% Mirip)`,
       estimatedCost:  { [duration]: Math.floor(d.totalBaseCost + transportCost + foodCost + ticketCost) },
-      badges:         [label, `⭐ ${d.rating}`, d.city],
+      badges:         [label, ` ${d.rating}`, d.city],
     });
 
     return NextResponse.json({
@@ -562,7 +520,7 @@ const primarySelection = affordableItems.sort((a, b) => b.finalScore - a.finalSc
           distanceLabel:  `Jarak: ${Math.round(primarySelection.distanceKm)} km | Transport: ${transport.mode}`,
           estimatedCost:  { [duration]: transportCost + hotelCost + foodCost + ticketCost },
           transportCost, hotelCost, foodCost, ticketCost,
-          badges:         [`⭐ Rating: ${primarySelection.rating}`, transport.mode, ...primarySelection.tags],
+          badges:         [` Rating: ${primarySelection.rating}`, transport.mode, ...primarySelection.tags],
           hiddenGems:     realPOIs.map(p => p.name).slice(0, 3),
           itinerary:      { [duration]: actualItinerary },
         },
