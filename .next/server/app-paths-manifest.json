@@ -1,5 +1,5 @@
 {
   "/planner/page": "app/planner/page.js",
-  "/api/auth/me/route": "app/api/auth/me/route.js",
-  "/api/generate-itinerary/route": "app/api/generate-itinerary/route.js"
+  "/destinations/page": "app/destinations/page.js",
+  "/page": "app/page.js"
 }

@@ -1,44 +1,49 @@
 "use client";
 import { useState, useRef } from "react";
 import {
-  Wallet, Compass, Sparkles, Clock, Search, ChevronDown,
-  Loader2, MapPin, Users, Calendar, Car, Heart, Utensils, Info,
-  TrendingUp, AlertTriangle, Star,
+  Wallet, Compass, Sparkles, Clock, Search, TrendingUp, Zap,
+  ChevronDown, Leaf, Waves, Mountain, Utensils, Home, Users,
+  User, Heart, Globe, Loader2, CheckCircle, ChevronRight,
+  AlertTriangle,
 } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import {
-  SUPPORTED_REGIONS, CATEGORIES_LIST, VIBES_LIST, FOODS_LIST,
-  TRANSPORTS, INTENSITIES, Category, Vibe, FoodType,
-} from "@/data/pois";
-import { buildItinerary, PlannerInput, ItineraryResult, DayPlan, ScheduledItem } from "@/lib/planner-ai";
-import { attachNarrative } from "@/lib/itinerary-narrator";
+import { Badge, Stars, SkeletonCard, DestCard } from "@/components/ui/cards";
+import { filterDestinations, fmt, parseItineraryDays } from "@/lib/utils";
+import { PREFERENCES, DURATIONS, savingTips, upgradeTips } from "@/data/destinations";
 
-const fmt = (n: number) => `Rp${Math.round(n).toLocaleString("id-ID")}`;
+const PREF_ICONS: Record<string, React.FC<{ size?: number; className?: string }>> = {
+  Pantai: Waves, Gunung: Mountain, Kuliner: Utensils, Staycation: Home,
+  Alam: Leaf, "Hidden Gem": Sparkles, Keluarga: Users, "Solo Trip": User,
+  Healing: Heart, "Wisata Kota": Globe,
+};
 
 export default function PlannerPage() {
-  const [startRegion, setStartRegion] = useState<string>(SUPPORTED_REGIONS[0]);
-  const [budget, setBudget] = useState(3_000_000);
-  const [numDays, setNumDays] = useState(3);
-  const [numPeople, setNumPeople] = useState(2);
-  const [transport, setTransport] = useState<PlannerInput["transport"]>("rental-mobil");
-  const [intensity, setIntensity] = useState<PlannerInput["intensity"]>("normal");
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [vibe, setVibe] = useState<Vibe>("healing");
-  const [foods, setFoods] = useState<FoodType[]>(["lokal", "halal"]);
+  // ── Form state ──────────────────────────────────────────────────────────
+  const [budget, setBudget]               = useState(1_500_000);
+  const [budgetInput, setBudgetInput]     = useState("1500000");
+  const [budgetCategory, setBudgetCategory] = useState("standar");
+  const [originCity, setOriginCity]       = useState("Surabaya");
+  const [preferences, setPreferences]     = useState<string[]>([]);
+  const [duration, setDuration]           = useState("2D1N");
 
-  const [result, setResult] = useState<ItineraryResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [activeDay, setActiveDay] = useState(0);
-  const [showReasonings, setShowReasonings] = useState(false);
-  const resultRef = useRef<HTMLDivElement>(null);
-<<<<<<< HEAD
-  // Tambah state ini di atas, bareng state lainnya
-  const [budgetError, setBudgetError] = useState<{ message: string; suggestion: string; minBudget: number } | null>(null);
-  const budgetPresets: Record<string, number> = { hemat: 500000, standar: 1500000, premium: 3500000 };
+  // ── Result state ─────────────────────────────────────────────────────────
+  const [results, setResults]             = useState<ReturnType<typeof filterDestinations> | null>(null);
+  const [budgetError, setBudgetError]     = useState<{
+    message: string; suggestion: string; minBudget: number;
+  } | null>(null);
+  const [loading, setLoading]             = useState(false);
 
-  const togglePref = (p: string) =>
-    setPreferences((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+  // ── UI state ─────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab]         = useState("terbaik");
+  const [itineraryOpen, setItineraryOpen] = useState(false);
+  const [activeDay, setActiveDay]         = useState(0);
+  const resultRef                         = useRef<HTMLDivElement>(null);
+
+  // ── Budget presets ────────────────────────────────────────────────────────
+  const budgetPresets: Record<string, number> = {
+    hemat: 500_000, standar: 1_500_000, premium: 3_500_000,
+  };
 
   const handleBudgetCategory = (cat: string) => {
     setBudgetCategory(cat);
@@ -46,62 +51,86 @@ export default function PlannerPage() {
     setBudgetInput(String(budgetPresets[cat]));
   };
 
-  // Di dalam komponen PlannerPage di planner/page.tsx
+  // ── Toggle preference ────────────────────────────────────────────────────
+  const togglePref = (p: string) =>
+    setPreferences(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
 
+  // ── Search handler ───────────────────────────────────────────────────────
   const handleSearch = async () => {
-  setLoading(true);
-  setResults(null);
-  setBudgetError(null); // ← reset error setiap kali search
+    setLoading(true);
+    setResults(null);
+    setBudgetError(null);
 
-  try {
-    const response = await fetch("/api/generate-itinerary", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ budget, duration, preferences, originCity }),
-    });
-
-    const resData = await response.json();
-
-    if (response.ok && resData.success) {
-      setResults(resData.data);
-      setActiveTab("terbaik");
-      setItineraryOpen(false);
-      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-    } else if (resData.errorType === "BUDGET_TOO_LOW") {
-      // ← tangkap error budget khusus
-      setBudgetError({
-        message: resData.error,
-        suggestion: resData.suggestion,
-        minBudget: resData.minBudgetNeeded,
+    try {
+      const response = await fetch("/api/generate-itinerary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ budget, duration, preferences, originCity }),
       });
-      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-    } else {
-      alert(resData.error || "Terjadi kesalahan saat mencari destinasi.");
-    }
-  } catch (error) {
-    console.error("Gagal mengambil data:", error);
-    alert("Koneksi bermasalah. Coba lagi nyahh!");
-  } finally {
-    setLoading(false);
-  }
-};
 
+      const resData = await response.json();
+
+      if (response.ok && resData.success) {
+        setResults(resData.data);
+        setActiveTab("terbaik");
+        setItineraryOpen(false);
+        setActiveDay(0);
+        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      } else if (resData.errorType === "BUDGET_TOO_LOW") {
+        setBudgetError({
+          message:    resData.error,
+          suggestion: resData.suggestion,
+          minBudget:  resData.minBudgetNeeded,
+        });
+        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      } else {
+        alert(resData.error || "Terjadi kesalahan saat mencari destinasi.");
+      }
+    } catch (error) {
+      console.error("Gagal mengambil data:", error);
+      alert("Koneksi bermasalah. Coba lagi nyahh!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Derived data ─────────────────────────────────────────────────────────
+  const maxDays = parseInt(duration.charAt(0)) || 1;
+
+  const rawItinerary = results
+    ? (results.main.itinerary[results.durationKey]
+      || results.main.itinerary[duration]
+      || results.main.itinerary["2D1N"]
+      || [])
+    : [];
+
+  const itineraryDays = parseItineraryDays(rawItinerary).slice(0, maxDays);
+
+  const currentTabDests = results
+    ? activeTab === "terbaik" ? results.alternatives
+      : activeTab === "murah" ? results.cheaper
+      : results.pricier
+    : [];
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50">
       <Navbar />
 
-      <section className="py-10 px-4 text-center">
-        <div className="inline-flex items-center gap-2 bg-sky-100 text-sky-700 text-xs font-bold px-3 py-1.5 rounded-full mb-3 border border-sky-200">
-          <Sparkles size={12} /> A* AI Planner — Multi-Day Smart Itinerary
+      {/* Hero */}
+      <section className="py-12 px-4 text-center">
+        <div className="inline-flex items-center gap-2 bg-sky-100 text-sky-700 text-xs font-bold px-3 py-1.5 rounded-full mb-4 border border-sky-200">
+          <Sparkles size={12} /> AI-Powered Travel Planner
         </div>
-        <h1 className="font-display text-3xl md:text-5xl font-black text-gray-900 mb-2">
-          Bikin Itinerary <span className="gradient-text">Senatural Manusia</span>
+        <h1 className="font-display text-4xl md:text-5xl font-black text-gray-900 mb-3">
+          Rencanakan <span className="gradient-text">Liburanmu</span>
         </h1>
-        <p className="text-gray-500 max-w-xl mx-auto text-sm leading-relaxed">
-          Isi preferensi lo, AI bakal racik urutan destinasi, jam, makan, dan penginapan yang masuk akal — bukan asal tempel.
+        <p className="text-gray-500 max-w-lg mx-auto text-sm leading-relaxed">
+          Masukkan budget, durasi, dan preferensimu. AI kami akan merekomendasikan destinasi + itinerary terbaik.
         </p>
       </section>
 
+      {/* Planner Form */}
       <section className="px-4 pb-8" id="planner">
         <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
           <div className="gradient-bg px-6 py-4 flex items-center gap-3">
@@ -109,450 +138,403 @@ export default function PlannerPage() {
               <Compass size={18} className="text-white" />
             </div>
             <div>
-              <h2 className="font-display font-black text-lg text-white">AI Travel Planner</h2>
-              <p className="text-sky-100 text-xs">Powered by A* search — optimal multi-day routing</p>
+              <h2 className="font-display font-black text-lg text-white">Perencana Liburan</h2>
+              <p className="text-sky-100 text-xs">Isi form di bawah dan dapatkan rekomendasi instan</p>
             </div>
           </div>
 
           <div className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 mb-2">
-                  <MapPin size={14} className="text-sky-500" /> Lokasi Tujuan
-                </label>
-                <select value={startRegion} onChange={(e) => setStartRegion(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-sky-400 text-sm font-semibold"
-                >
-                  {SUPPORTED_REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 mb-2">
-                  <Calendar size={14} className="text-sky-500" /> Jumlah Hari
-                </label>
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button key={n} onClick={() => setNumDays(n)}
-                      className={`flex-1 py-2 rounded-xl text-xs font-bold transition border ${
-                        numDays === n ? "gradient-bg text-white border-transparent"
-                          : "bg-gray-50 text-gray-600 border-gray-200 hover:border-sky-300"
-                      }`}
-                    >{n}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 mb-2">
-                  <Users size={14} className="text-sky-500" /> Jumlah Orang
-                </label>
-                <input type="number" min="1" max="10" value={numPeople}
-                  onChange={(e) => setNumPeople(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-sky-400 text-sm font-semibold"
-                />
-              </div>
-            </div>
-
+            {/* Kota Asal */}
             <div>
               <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3">
-                <Wallet size={16} className="text-sky-500" /> Total Budget
-                <span className="ml-auto text-xs font-normal text-gray-500">untuk {numPeople} orang × {numDays} hari</span>
+                <Globe size={16} className="text-sky-500" /> Kota Asal Keberangkatan
               </label>
-              <div className="flex gap-2 mb-3 flex-wrap">
-                {[
-                  { label: "Hemat", value: 1_500_000 },
-                  { label: "Standar", value: 3_500_000 },
-                  { label: "Nyaman", value: 6_000_000 },
-                  { label: "Premium", value: 10_000_000 },
-                ].map((b) => (
-                  <button key={b.value} onClick={() => setBudget(b.value)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition border ${
-                      budget === b.value ? "gradient-bg text-white border-transparent"
+              <select
+                value={originCity}
+                onChange={e => setOriginCity(e.target.value)}
+                className="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 text-sm font-semibold text-gray-700 bg-white transition"
+              >
+                <option value="Jakarta">Jakarta (CGK)</option>
+                <option value="Surabaya">Surabaya (SUB)</option>
+                <option value="Bandung">Bandung (BDO)</option>
+                <option value="Yogyakarta">Yogyakarta (YIA)</option>
+              </select>
+            </div>
+
+            {/* Budget */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3">
+                <Wallet size={16} className="text-sky-500" /> Budget Total Liburan
+              </label>
+              <div className="flex gap-2 mb-3">
+                {["hemat", "standar", "premium"].map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => handleBudgetCategory(cat)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold capitalize transition border ${
+                      budgetCategory === cat
+                        ? "gradient-bg text-white border-transparent shadow-md shadow-sky-200"
                         : "bg-gray-50 text-gray-600 border-gray-200 hover:border-sky-300"
                     }`}
-                  >{b.label}<span className="ml-1.5 opacity-70">{fmt(b.value)}</span></button>
+                  >
+                    {cat}
+                  </button>
                 ))}
               </div>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">Rp</span>
-                <input type="number" value={budget} onChange={(e) => setBudget(parseInt(e.target.value) || 0)}
-                  className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:border-sky-400 text-sm font-semibold"
+                <input
+                  type="number"
+                  value={budgetInput}
+                  onChange={e => {
+                    setBudgetInput(e.target.value);
+                    setBudget(parseInt(e.target.value) || 0);
+                    setBudgetCategory(""); // clear preset kalau diubah manual
+                  }}
+                  className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 text-sm font-semibold transition"
+                  placeholder="1500000"
                 />
               </div>
+              <p className="text-xs text-gray-400 mt-1.5">
+                Budget kamu: <span className="font-bold text-sky-600">{fmt(budget)}</span>
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-2">
-                  <Car size={16} className="text-sky-500" /> Transportasi
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {TRANSPORTS.map((t) => (
-                    <button key={t.value} onClick={() => setTransport(t.value)}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold transition border ${
-                        transport === t.value ? "gradient-bg text-white border-transparent"
-                          : "bg-gray-50 text-gray-600 border-gray-200 hover:border-sky-300"
-                      }`}
-                    >{t.label}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-2">
-                  <TrendingUp size={16} className="text-sky-500" /> Intensitas
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {INTENSITIES.map((i) => (
-                    <button key={i.value} onClick={() => setIntensity(i.value)}
-                      className={`px-2 py-2 rounded-xl text-xs font-bold transition border ${
-                        intensity === i.value ? "gradient-bg text-white border-transparent"
-                          : "bg-gray-50 text-gray-600 border-gray-200 hover:border-sky-300"
-                      }`}
-                    >{i.label}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
+            {/* Durasi */}
             <div>
-              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-2">
-                <Heart size={16} className="text-sky-500" /> Vibe Perjalanan
+              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3">
+                <Clock size={16} className="text-sky-500" /> Durasi Perjalanan
               </label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                {VIBES_LIST.map((v) => (
-                  <button key={v.value} onClick={() => setVibe(v.value)}
-                    className={`px-3 py-2.5 rounded-xl text-xs transition border text-left ${
-                      vibe === v.value ? "gradient-bg text-white border-transparent"
-                        : "bg-gray-50 text-gray-700 border-gray-200 hover:border-sky-300"
+              <div className="flex gap-2 flex-wrap">
+                {DURATIONS.map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setDuration(d)}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold transition border ${
+                      duration === d
+                        ? "gradient-bg text-white border-transparent shadow-md shadow-sky-200"
+                        : "bg-gray-50 text-gray-600 border-gray-200 hover:border-sky-300"
                     }`}
                   >
-                    <div className="font-bold">{v.icon} {v.label}</div>
-                    <div className={`text-[10px] mt-0.5 ${vibe === v.value ? "text-white/80" : "text-gray-500"}`}>{v.description}</div>
+                    {d}
                   </button>
                 ))}
               </div>
             </div>
 
+            {/* Preferensi */}
             <div>
-              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-2">
-                <Sparkles size={16} className="text-sky-500" /> Kategori Favorit
-                <span className="font-normal text-gray-400 text-xs">(opsional, pilih beberapa)</span>
+              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3">
+                <Sparkles size={16} className="text-sky-500" /> Preferensi Wisata{" "}
+                <span className="font-normal text-gray-400">(pilih beberapa)</span>
               </label>
               <div className="flex flex-wrap gap-2">
-                {CATEGORIES_LIST.map((c) => (
-                  <button key={c.value} onClick={() => toggleString(categories, c.value, setCategories)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition border ${
-                      categories.includes(c.value) ? "gradient-bg text-white border-transparent"
-                        : "bg-gray-50 text-gray-600 border-gray-200 hover:border-sky-300"
-                    }`}
-                  >{c.icon} {c.label}</button>
-                ))}
+                {PREFERENCES.map(p => {
+                  const Icon = PREF_ICONS[p];
+                  const active = preferences.includes(p);
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => togglePref(p)}
+                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition border ${
+                        active
+                          ? "gradient-bg text-white border-transparent shadow-md shadow-sky-200"
+                          : "bg-gray-50 text-gray-600 border-gray-200 hover:border-sky-300"
+                      }`}
+                    >
+                      {Icon && <Icon size={13} />} {p}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div>
-              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-2">
-                <Utensils size={16} className="text-sky-500" /> Preferensi Makanan
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {FOODS_LIST.map((f) => (
-                  <button key={f.value} onClick={() => toggleString(foods, f.value, setFoods)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition border ${
-                      foods.includes(f.value) ? "gradient-bg text-white border-transparent"
-                        : "bg-gray-50 text-gray-600 border-gray-200 hover:border-sky-300"
-                    }`}
-                  >{f.label}</button>
-                ))}
-              </div>
-            </div>
-
-            <button onClick={handleSearch} disabled={loading}
-              className="w-full py-3.5 gradient-bg text-white font-black rounded-2xl shadow-lg shadow-sky-200 flex items-center justify-center gap-2 hover:opacity-95 transition disabled:opacity-60"
+            <button
+              onClick={handleSearch}
+              disabled={loading}
+              className="w-full gradient-bg text-white font-black py-4 rounded-2xl hover:opacity-90 transition disabled:opacity-60 flex items-center justify-center gap-2 shadow-lg shadow-sky-200 text-sm"
             >
-              {loading ? (<><Loader2 size={18} className="animate-spin" /> Menyusun itinerary...</>)
-                : (<><Search size={18} /> Generate Itinerary</>)}
+              {loading
+                ? <><Loader2 size={18} className="animate-spin" /> Mencari destinasi terbaik...</>
+                : <><Search size={18} /> Temukan Destinasi Ideal</>
+              }
             </button>
           </div>
         </div>
       </section>
 
+      {/* Loading Skeleton */}
       {loading && (
-        <section className="px-4 pb-12">
-          <div className="max-w-3xl mx-auto bg-white rounded-3xl p-8 shadow-lg border border-gray-100 text-center">
-            <Loader2 size={32} className="text-sky-500 animate-spin mx-auto mb-3" />
-            <p className="text-sm font-bold text-gray-700">A* engine sedang racik itinerary...</p>
-            <p className="text-xs text-gray-400 mt-1">Mengevaluasi {numDays} hari × beam-search × constraints</p>
+        <section className="px-4 pb-8">
+          <div className="max-w-3xl mx-auto">
+            <SkeletonCard />
           </div>
         </section>
       )}
 
-      {result && !loading && (
-        <div ref={resultRef}>
-          <section className="px-4 pb-6">
-            <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
-              <div className="gradient-bg px-6 py-5">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div>
-                    <p className="text-sky-100 text-xs font-bold mb-1">ITINERARY {result.input.numDays} HARI</p>
-                    <h3 className="font-display font-black text-xl text-white">{result.input.startRegion} — vibe {result.input.vibe}</h3>
-                  </div>
-                  <div className="text-right text-white">
-                    <p className="text-xs text-sky-100">Total estimasi</p>
-                    <p className="font-display font-black text-2xl">{fmt(result.totalCost)}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
-                <Stat icon="📍" value={`${result.totalDistanceKm.toFixed(0)} km`} label="Total Jarak" />
-                <Stat icon="⏱️" value={`${Math.round(result.totalTravelMin / 60)} jam`} label="Waktu Perjalanan" />
-                <Stat icon="🏨" value={result.lodging?.name.split(" ").slice(0, 2).join(" ") ?? "-"} label="Penginapan" />
-              </div>
-
-              <div className="p-5 bg-gradient-to-br from-sky-50 to-emerald-50 border-b border-gray-100">
-                <p className="text-xs font-bold text-gray-600 mb-3">RINCIAN BIAYA</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <Row label="🎟️ Tiket destinasi" value={fmt(result.costBreakdown.tickets)} />
-                  <Row label="🍽️ Makan" value={fmt(result.costBreakdown.meals)} />
-                  <Row label="🏨 Penginapan" value={fmt(result.costBreakdown.lodging)} />
-                  <Row label="🚗 Transport" value="hitung manual" subtle />
-                </div>
-              </div>
-
-              {result.warnings.length > 0 && (
-                <div className="p-4 bg-amber-50 border-b border-amber-100">
-                  {result.warnings.map((w, i) => (
-                    <div key={i} className="flex items-start gap-2 text-xs text-amber-800">
-                      <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                      <span>{w}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="p-6">
-                <p className="text-xs font-bold text-sky-600 mb-3 flex items-center gap-1.5">
-                  <Sparkles size={12} /> KATA AI PLANNER
+      {/* Budget Error */}
+      {budgetError && !loading && (
+        <div ref={resultRef} className="px-4 pb-8 slide-in">
+          <div className="max-w-3xl mx-auto">
+            <div className="bg-white rounded-3xl shadow-xl border border-red-100 overflow-hidden">
+              <div className="bg-gradient-to-br from-red-50 to-orange-50 p-8 text-center">
+                <div className="text-5xl mb-4">😔</div>
+                <h3 className="font-display font-black text-xl text-gray-800 mb-2">
+                  Budget Tidak Mencukupi
+                </h3>
+                <p className="text-gray-500 text-sm mb-6 max-w-md mx-auto">
+                  {budgetError.message}
                 </p>
-                <div className="text-sm text-gray-700 leading-relaxed space-y-2">
-                  {result.narrative.split("\n").map((line, i) =>
-                    line.startsWith("**") ? (
-                      <p key={i} className="font-bold text-gray-900 mt-3">
-                        {line.replace(/\*\*/g, "")}
+                <div className="bg-white rounded-2xl p-4 border border-red-100 inline-block mb-6">
+                  <p className="text-xs text-gray-400 mb-1">Minimum budget yang dibutuhkan</p>
+                  <p className="font-black text-2xl text-red-500">{fmt(budgetError.minBudget)}</p>
+                </div>
+                <p className="text-xs text-gray-400 mb-6">{budgetError.suggestion}</p>
+                <div className="flex gap-3 justify-center flex-wrap">
+                  <button
+                    onClick={() => {
+                      setBudget(budgetError.minBudget);
+                      setBudgetInput(String(budgetError.minBudget));
+                      setBudgetCategory("");
+                      setBudgetError(null);
+                      document.getElementById("planner")?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    className="gradient-bg text-white font-black px-6 py-3 rounded-2xl text-sm hover:opacity-90 transition shadow-lg shadow-sky-200"
+                  >
+                    Pakai Budget {fmt(budgetError.minBudget)}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setBudgetError(null);
+                      document.getElementById("planner")?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    className="bg-gray-100 text-gray-600 font-bold px-6 py-3 rounded-2xl text-sm hover:bg-gray-200 transition"
+                  >
+                    Ubah Budget Manual
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Results */}
+      {results && !loading && (
+        <div ref={resultRef} className="slide-in">
+          {/* Main Result */}
+          <section className="px-4 pb-8">
+            <div className="max-w-3xl mx-auto">
+              <div className="flex items-center gap-2 mb-4">
+                <CheckCircle size={18} className="text-emerald-500" />
+                <h2 className="font-display font-black text-xl text-gray-900">
+                  Rekomendasi Terbaik Untukmu
+                </h2>
+              </div>
+              <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+                {/* Header */}
+                <div className="gradient-bg p-6">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="text-5xl mb-3">{results.main.image}</div>
+                      <h3 className="font-display font-black text-2xl text-white">{results.main.name}</h3>
+                      <p className="text-sky-100 text-sm mt-1">
+                        {results.main.city}, {results.main.province} · {results.main.distanceLabel}
                       </p>
-                    ) : line.trim() === "" ? null : (
-                      <p key={i}>{line}</p>
-                    )
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-black text-white">
+                        {fmt(results.main.estimatedCost[results.durationKey]
+                          || results.main.estimatedCost["2D1N"]
+                          || 0)}
+                      </div>
+                      <div className="text-sky-200 text-xs mt-1">estimasi total</div>
+                      <div className="flex gap-1 flex-wrap justify-end mt-2">
+                        {results.main.badges.map(b => <Badge key={b} label={b} />)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cost breakdown */}
+                <div className="p-5 border-b border-gray-100">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { label: "Transport", value: results.main.transportCost, icon: "🚗" },
+                      { label: "Hotel",     value: results.main.hotelCost,     icon: "🏨" },
+                      { label: "Makan",     value: results.main.foodCost,      icon: "🍽️" },
+                      { label: "Tiket",     value: results.main.ticketCost,    icon: "🎫" },
+                    ].map(c => (
+                      <div key={c.label} className="bg-gray-50 rounded-2xl p-3 text-center">
+                        <div className="text-xl mb-1">{c.icon}</div>
+                        <div className="font-black text-sm text-gray-800">{fmt(c.value)}</div>
+                        <div className="text-xs text-gray-400">{c.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Itinerary toggle */}
+                <div className="p-5">
+                  <button
+                    onClick={() => setItineraryOpen(!itineraryOpen)}
+                    className="w-full flex items-center justify-between bg-sky-50 hover:bg-sky-100 transition rounded-2xl px-4 py-3"
+                  >
+                    <span className="font-bold text-sky-700 text-sm">📍 Lihat Itinerary Lengkap</span>
+                    <ChevronDown
+                      size={18}
+                      className={`text-sky-500 transition-transform ${itineraryOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+
+                  {itineraryOpen && (
+                    <div className="mt-4 slide-in">
+                      {itineraryDays.length > 1 && (
+                        <div className="flex gap-2 mb-4">
+                          {itineraryDays.map((_, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setActiveDay(i)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                                activeDay === i ? "gradient-bg text-white" : "bg-gray-100 text-gray-600"
+                              }`}
+                            >
+                              Hari {i + 1}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <div className="space-y-3">
+                        {(itineraryDays[activeDay] || itineraryDays[0] || []).map((item, idx) => (
+                          <div key={idx} className="flex gap-3">
+                            <div className="flex flex-col items-center">
+                              <div className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center text-sm shrink-0">
+                                {item.icon}
+                              </div>
+                              {idx < (itineraryDays[activeDay]?.length ?? 0) - 1 && (
+                                <div className="w-px flex-1 bg-gray-100 mt-1" />
+                              )}
+                            </div>
+                            <div className="pb-3 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <span className="text-xs font-bold text-sky-500 mr-2">{item.time}</span>
+                                  <span className="text-sm font-semibold text-gray-800">{item.activity}</span>
+                                  <div className="text-xs text-gray-400 mt-0.5">📍 {item.location}</div>
+                                </div>
+                                {item.cost > 0 && (
+                                  <span className="text-xs font-bold text-emerald-600 shrink-0">
+                                    {fmt(item.cost)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
             </div>
           </section>
 
-          <section className="px-4 pb-6">
+          {/* Alternatives */}
+          <section className="px-4 pb-8">
             <div className="max-w-3xl mx-auto">
-              {result.days.length > 1 && (
-                <div className="flex gap-2 mb-4 flex-wrap">
-                  {result.days.map((d, i) => (
-                    <button key={i} onClick={() => setActiveDay(i)}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold transition border ${
-                        activeDay === i ? "gradient-bg text-white border-transparent shadow-md shadow-sky-200"
-                          : "bg-white text-gray-700 border-gray-200 hover:border-sky-300"
-                      }`}
-                    >Hari {d.dayNumber} <span className="opacity-60">• {d.cluster}</span></button>
+              <h2 className="font-display font-black text-xl text-gray-900 mb-4">Pilihan Lainnya</h2>
+              <div className="flex gap-2 mb-4 flex-wrap">
+                {[
+                  { key: "terbaik", label: "Alternatif Terbaik" },
+                  { key: "murah",   label: "💰 Lebih Hemat"     },
+                  { key: "mahal",   label: "✨ Lebih Premium"   },
+                ].map(t => (
+                  <button
+                    key={t.key}
+                    onClick={() => setActiveTab(t.key)}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition border ${
+                      activeTab === t.key
+                        ? "gradient-bg text-white border-transparent"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-sky-300"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              {currentTabDests.length > 0 ? (
+                <div className="grid sm:grid-cols-3 gap-4">
+                  {currentTabDests.map(dest => (
+                    <DestCard key={dest.id} dest={dest} durationKey={results.durationKey} />
                   ))}
                 </div>
+              ) : (
+                <p className="text-gray-400 text-sm text-center py-6">
+                  Tidak ada pilihan di kategori ini.
+                </p>
               )}
-
-              {result.days[activeDay] && <DayTimeline day={result.days[activeDay]} />}
             </div>
           </section>
 
+          {/* Insights */}
           <section className="px-4 pb-12">
             <div className="max-w-3xl mx-auto">
-              <button onClick={() => setShowReasonings(!showReasonings)}
-                className="w-full flex items-center justify-between bg-white hover:bg-sky-50 transition rounded-2xl px-5 py-4 border border-gray-100 shadow-sm"
-              >
-                <span className="font-bold text-gray-800 text-sm flex items-center gap-2">
-                  <Info size={16} className="text-sky-500" /> Kenapa AI pilih destinasi ini?
-                </span>
-                <ChevronDown size={18} className={`text-sky-500 transition-transform ${showReasonings ? "rotate-180" : ""}`} />
-              </button>
-              {showReasonings && (
-                <div className="mt-3 bg-white rounded-2xl border border-gray-100 p-5 space-y-2 slide-in">
-                  {result.reasonings.map((r, i) => (
-                    <div key={i} className="text-xs">
-                      <span className="font-bold text-gray-800">{r.poiName}</span>
-                      <span className="text-gray-500"> — {r.reason}</span>
-                    </div>
-                  ))}
+              <h2 className="font-display font-black text-xl text-gray-900 mb-4">Insight & Tips</h2>
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-5 border border-amber-100">
+                  <div className="w-10 h-10 bg-amber-400 rounded-2xl flex items-center justify-center mb-3">
+                    <TrendingUp size={18} className="text-white" />
+                  </div>
+                  <h3 className="font-bold text-gray-800 text-sm mb-2">💡 Saran Upgrade</h3>
+                  <p className="text-gray-600 text-xs leading-relaxed">
+                    {upgradeTips.find(t => budget >= t.from && budget <= t.to)?.message
+                      ?? "Tambah Rp300.000 bisa dapat hotel lebih nyaman dan lebih dekat ke pantai."}
+                  </p>
                 </div>
-              )}
+                <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-3xl p-5 border border-emerald-100">
+                  <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center mb-3">
+                    <Zap size={18} className="text-white" />
+                  </div>
+                  <h3 className="font-bold text-gray-800 text-sm mb-3">⚡ Tips Hemat</h3>
+                  <ul className="space-y-1.5">
+                    {savingTips.slice(0, 4).map((t, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-xs text-gray-600">
+                        <span className="text-sm leading-none mt-0.5">{t.icon}</span>
+                        <span className="leading-relaxed">{t.tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-3xl p-5 border border-purple-100">
+                  <div className="w-10 h-10 bg-purple-500 rounded-2xl flex items-center justify-center mb-3">
+                    <Sparkles size={18} className="text-white" />
+                  </div>
+                  <h3 className="font-bold text-gray-800 text-sm mb-3">✨ Hidden Gem Sekitar</h3>
+                  <ul className="space-y-2">
+                    {results.main.hiddenGems.map((g, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-xs text-gray-600">
+                        <span className="text-emerald-500 mt-0.5">◆</span>
+                        <span className="leading-relaxed">{g}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
             </div>
           </section>
         </div>
       )}
-      {/* Budget Error */}
-{budgetError && !loading && (
-  <div ref={resultRef} className="px-4 pb-8 slide-in">
-    <div className="max-w-3xl mx-auto">
-      <div className="bg-white rounded-3xl shadow-xl border border-red-100 overflow-hidden">
-        <div className="bg-gradient-to-br from-red-50 to-orange-50 p-8 text-center">
-          <div className="text-5xl mb-4">😔</div>
-          <h3 className="font-display font-black text-xl text-gray-800 mb-2">
-            Budget Tidak Mencukupi
-          </h3>
-          <p className="text-gray-500 text-sm mb-6 max-w-md mx-auto">
-            {budgetError.message}
-          </p>
-
-          {/* Highlight minimum budget */}
-          <div className="bg-white rounded-2xl p-4 border border-red-100 inline-block mb-6">
-            <p className="text-xs text-gray-400 mb-1">Minimum budget yang dibutuhkan</p>
-            <p className="font-black text-2xl text-red-500">{fmt(budgetError.minBudget)}</p>
-          </div>
-
-          <p className="text-xs text-gray-400 mb-6">{budgetError.suggestion}</p>
-
-          {/* Tombol shortcut naikan budget */}
-          <div className="flex gap-3 justify-center flex-wrap">
-            <button
-              onClick={() => {
-                setBudget(budgetError.minBudget);
-                setBudgetInput(String(budgetError.minBudget));
-                setBudgetCategory("");
-                document.getElementById("planner")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className="gradient-bg text-white font-black px-6 py-3 rounded-2xl text-sm hover:opacity-90 transition shadow-lg shadow-sky-200"
-            >
-              Pakai Budget {fmt(budgetError.minBudget)}
-            </button>
-            <button
-              onClick={() => {
-                document.getElementById("planner")?.scrollIntoView({ behavior: "smooth" });
-                setBudgetError(null);
-              }}
-              className="bg-gray-100 text-gray-600 font-bold px-6 py-3 rounded-2xl text-sm hover:bg-gray-200 transition"
-            >
-              Ubah Budget Manual
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
 
       <Footer />
 
+      {/* Mobile sticky CTA */}
       <div className="fixed bottom-4 left-4 right-4 md:hidden z-40">
-        <button onClick={() => document.getElementById("planner")?.scrollIntoView({ behavior: "smooth" })}
+        <button
+          onClick={() => document.getElementById("planner")?.scrollIntoView({ behavior: "smooth" })}
           className="w-full py-3.5 gradient-bg text-white font-black text-sm rounded-2xl shadow-2xl shadow-sky-300 flex items-center justify-center gap-2"
         >
-          <Search size={16} /> Generate Ulang
+          <Search size={16} /> Rencanakan Liburanmu
         </button>
-      </div>
-    </div>
-  );
-  
-}
-
-function Stat({ icon, value, label }: { icon: string; value: string; label: string }) {
-  return (
-    <div className="p-4 text-center">
-      <div className="text-xl mb-1">{icon}</div>
-      <div className="font-black text-sm text-gray-800 truncate">{value}</div>
-      <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">{label}</div>
-    </div>
-  );
-}
-
-function Row({ label, value, subtle = false }: { label: string; value: string; subtle?: boolean }) {
-  return (
-    <div className="flex justify-between items-center bg-white/70 px-3 py-2 rounded-lg">
-      <span className="text-gray-600">{label}</span>
-      <span className={`font-bold ${subtle ? "text-gray-400 italic" : "text-gray-900"}`}>{value}</span>
-    </div>
-  );
-}
-
-function DayTimeline({ day }: { day: DayPlan }) {
-  return (
-    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 bg-gradient-to-br from-sky-50 to-emerald-50 border-b border-gray-100">
-        <div className="flex items-center justify-between gap-2">
-          <h4 className="font-display font-black text-lg text-gray-900">
-            Hari {day.dayNumber} — {day.cluster}
-          </h4>
-          <span className="text-xs font-bold text-sky-700">{fmt(day.totalCost)}</span>
-        </div>
-        <p className="text-xs text-gray-500 mt-1">{day.summary}</p>
-        <p className="text-[11px] text-gray-400 mt-0.5">
-          {day.totalDistanceKm.toFixed(1)} km · {(day.totalTravelMin / 60).toFixed(1)} jam di jalan
-        </p>
-      </div>
-
-      <div className="p-5 space-y-1">
-        {day.items.map((item, idx) => (
-          <TimelineItem key={idx} item={item} isLast={idx === day.items.length - 1} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TimelineItem({ item, isLast }: { item: ScheduledItem; isLast: boolean }) {
-  const isTravel = item.type === "travel";
-  const isMeal = item.type === "meal";
-  const isLodging = item.type === "lodging";
-  const isPoi = item.type === "poi";
-
-  return (
-    <div className="flex gap-3">
-      <div className="flex flex-col items-center pt-1">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 ${
-          isTravel ? "bg-gray-100" : isMeal ? "bg-amber-100" : isLodging ? "bg-purple-100" : "bg-sky-100"
-        }`}>{item.icon}</div>
-        {!isLast && <div className="w-px flex-1 bg-gray-100 mt-1 min-h-[20px]" />}
-      </div>
-
-      <div className={`flex-1 pb-3 ${isTravel ? "opacity-70" : ""}`}>
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-sky-500">{item.startTime}–{item.endTime}</span>
-              {isPoi && item.poi && (
-                <span className="flex items-center gap-0.5 text-[10px] text-amber-600 font-bold">
-                  <Star size={10} className="fill-amber-400 stroke-amber-400" /> {item.poi.rating.toFixed(1)}
-                </span>
-              )}
-            </div>
-            <p className={`text-sm mt-0.5 ${isTravel ? "text-gray-500 italic" : "font-semibold text-gray-800"}`}>
-              {item.label}
-            </p>
-            {isPoi && item.poi && (
-              <p className="text-[11px] text-gray-500 mt-0.5">📍 {item.poi.area} — {item.poi.blurb}</p>
-            )}
-            {isMeal && item.restaurant && (
-              <p className="text-[11px] text-gray-500 mt-0.5">
-                🍴 {item.restaurant.signature} · {item.restaurant.blurb}
-              </p>
-            )}
-            {isLodging && item.lodging && (
-              <p className="text-[11px] text-gray-500 mt-0.5">{item.lodging.blurb}</p>
-            )}
-            {item.reason && isPoi && (
-              <p className="text-[11px] text-sky-600 mt-1 italic">💡 {item.reason}</p>
-            )}
-            {isTravel && (
-              <p className="text-[11px] text-gray-400 mt-0.5">
-                {item.distanceKm?.toFixed(1)} km · {item.travelMin} min
-              </p>
-            )}
-          </div>
-          {item.cost > 0 && (
-            <span className="text-xs font-bold text-emerald-600 shrink-0">{fmt(item.cost)}</span>
-          )}
-        </div>
       </div>
     </div>
   );
