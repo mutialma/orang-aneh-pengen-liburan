@@ -2,8 +2,6 @@
 
 > **Sistem Rekomendasi Perjalanan Cerdas** yang menggabungkan beberapa algoritma Kecerdasan Artifisial (Hash Indexing, Weighted Scoring, Beam Search, A*, UCS, dan Cosine Similarity) untuk menghasilkan itinerary liburan yang optimal berdasarkan budget, preferensi, dan lokasi pengguna.
 
-**Mata Kuliah:** Konsep Dasar Kecerdasan Artifisial — UAS Semester 2  
-**Kelompok:** PLENGER
 
 ---
 
