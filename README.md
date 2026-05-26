@@ -438,6 +438,6 @@ model DestinationClick {
 
 ## 📜 Lisensi
 
-Proyek ini dibuat untuk keperluan akademik (UAS Konsep Dasar Kecerdasan Artifisial, Semester 2).
+Proyek ini dibuat untuk keperluan akademik.
 
 ---
