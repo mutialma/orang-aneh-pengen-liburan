@@ -441,7 +441,3 @@ model DestinationClick {
 Proyek ini dibuat untuk keperluan akademik (UAS Konsep Dasar Kecerdasan Artifisial, Semester 2).
 
 ---
-
-<p align="center">
-  Dibuat dengan ❤️ oleh <strong>Kelompok PLENGER</strong>
-</p>
