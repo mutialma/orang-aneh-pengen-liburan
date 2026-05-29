@@ -24,7 +24,7 @@ export function haversineDistance(
     Math.cos(nodeA.lat * (Math.PI / 180)) *
       Math.cos(nodeB.lat * (Math.PI / 180)) *
       Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+      Math.sin(dLon / 2); 
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c; // Hasil dalam kilometer

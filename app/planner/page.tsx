@@ -88,7 +88,7 @@ export default function PlannerPage() {
       }
     } catch (error) {
       console.error("Gagal mengambil data:", error);
-      alert("Koneksi bermasalah. Coba lagi nyahh!");
+      alert("Koneksi bermasalah. Coba lagi !");
     } finally {
       setLoading(false);
     }

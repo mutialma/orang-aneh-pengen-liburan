@@ -159,7 +159,7 @@ export async function POST(req: Request) {
     const { hotelCost, foodCost, ticketCost } = calcCostBreakdown(primarySelection, transportCost, totalDays);
 
     // ===================================================================
-    // STEP 5 — Modul 3: Fetch POI + Beam Search Itinerary
+    // STEP 5 — Modul 3: Fetch POI + A* Itinerary
     // ===================================================================
     const realPOIs = await fetchOpenTripMapPOIs(
       primarySelection.city,
