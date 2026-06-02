@@ -1,6 +1,7 @@
+// app/api/auth/register/route.ts
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { authUtils } from "@/lib/auth-utils";
+import prisma from "@/lib/prisma"; // Pastikan Anda punya file ini untuk inisialisasi PrismaClient
+import { authUtils } from "@/lib/auth-utils"; // Pastikan path ini sesuai dengan file algoritma kustom Anda
 
 export async function POST(req: Request) {
   try {
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email sudah terdaftar" }, { status: 400 });
     }
 
-    // PBKDF2 Hashing nyahh!
+    // Menggunakan algoritma hash kustom Anda
     const securePassword = await authUtils.hashPassword(password);
 
     const user = await prisma.user.create({
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
     }, { status: 201 });
 
   } catch (error) {
+    console.error("Register Error:", error); // Berguna untuk debugging
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
