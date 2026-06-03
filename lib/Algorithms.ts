@@ -1,17 +1,13 @@
 import { NodePOI, BeamState } from "./Registry";
 
-// =========================================================================
-// MODUL 1 — Hash Indexing
-// =========================================================================
+
 export function formulaHash(str: string, M = 200): number {
   let sum = 0;
   for (let i = 0; i < str.length; i++) sum += str.charCodeAt(i) * (i + 1);
   return sum % M;
 }
 
-// =========================================================================
-// HELPER — Haversine Distance (km)
-// =========================================================================
+
 export function haversineDistance(
   lat1: number, lon1: number,
   lat2: number, lon2: number
@@ -26,14 +22,11 @@ export function haversineDistance(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 1.25;
 }
 
+
 export function haversineKm(a: NodePOI, b: NodePOI): number {
   return haversineDistance(a.lat, a.lon, b.lat, b.lon);
 }
 
-// =========================================================================
-// MODUL 3A — h(n): Fitness Score
-// 0.25 pref + 0.20 vibe + 0.20 budget + 0.15 rating + 0.10 pop + 0.10 fam
-// =========================================================================
 export function fitnessScore(
   poi: NodePOI,
   preferences: string[],
@@ -59,10 +52,7 @@ export function fitnessScore(
   );
 }
 
-// =========================================================================
-// MODUL 3B — Hard Constraints Filter
-// Jam operasional, maks 50 km/hari, family, sudah dikunjungi
-// =========================================================================
+
 export function passesConstraints(
   poi: NodePOI,
   state: BeamState,
@@ -71,19 +61,20 @@ export function passesConstraints(
   dailyDistanceSoFar: number
 ): boolean {
   const hour = Math.floor(state.time / 60);
-  if (hour < (poi.openHour  ?? 8))  return false; // jam buka
-  if (hour > (poi.closeHour ?? 21)) return false; // jam tutup
-  if (dailyDistanceSoFar + distanceFromLastKm > 50) return false; // maks 50 km/hari
-  if (withFamily && !poi.familyFriendly) return false;            // family filter
-  if (state.visited.has(poi.id)) return false;                    // sudah dikunjungi
+  if (hour < (poi.openHour  ?? 8))  return false; 
+  if (hour > (poi.closeHour ?? 21)) return false; 
+  if (dailyDistanceSoFar + distanceFromLastKm > 50) return false; 
+  if (withFamily && !poi.familyFriendly) return false;            
+
+
+  if (state.visited.has(poi.id)) return false;                    
   return true;
 }
 
-// =========================================================================
-// MODUL 3C — Beam Search per hari
-// State: (lokasi, waktu, visited, budget) | Beam width = 8
-// f(n) = h(n) - normalized g(n)
-// =========================================================================
+
+
+
+
 const BEAM_WIDTH = 8;
 
 export function beamSearchDay(
@@ -113,13 +104,13 @@ export function beamSearchDay(
         const distKm = haversineKm(state.location, poi);
         if (!passesConstraints(poi, state, withFamily, distKm, dailyDistanceSoFar)) continue;
 
-        const travelMinutes = (distKm / 40) * 60; // asumsi 40 km/h
-        const newTime       = state.time + travelMinutes + 90; // +90 menit kunjungan
-        const newBudget     = state.budgetUsed + poi.cost;     // g(n) kumulatif
+        const travelMinutes = (distKm / 40) * 60; 
+        const newTime       = state.time + travelMinutes + 90; 
+        const newBudget     = state.budgetUsed + poi.cost;     
 
         if (newBudget > dailyBudget) continue;
 
-        // f(n) = h(n) - normalized g(n)
+       
         const h = fitnessScore(poi, preferences, dailyBudget, withFamily);
         const g = dailyBudget > 0 ? newBudget / dailyBudget : 0;
         const f = h - g;
@@ -149,9 +140,7 @@ export function beamSearchDay(
   return result;
 }
 
-// =========================================================================
-// MODUL 4 — Cosine Similarity
-// =========================================================================
+
 export function cosineSimilarity(vecA: number[], vecB: number[]): number {
   let dot = 0, normA = 0, normB = 0;
   for (let i = 0; i < vecA.length; i++) {
@@ -162,10 +151,7 @@ export function cosineSimilarity(vecA: number[], vecB: number[]): number {
   return normA === 0 || normB === 0 ? 0 : dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-// =========================================================================
-// MODUL 2 — Weighted Scoring (untuk pilih hotel/kota tujuan)
-// w1*nBudget + w2*nTag + w3*nDist
-// =========================================================================
+
 export function weightedScore(
   nBudget: number,
   nTag: number,

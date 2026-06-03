@@ -1,6 +1,3 @@
-// =========================================================================
-// TYPES
-// =========================================================================
 export type NodePOI = {
   id: string; name: string; lat: number; lon: number;
   type: string; cost: number; icon: string;
@@ -10,7 +7,7 @@ export type NodePOI = {
 
 export interface BeamState {
   location: NodePOI;
-  time: number;       // menit dari 00:00
+  time: number;       
   visited: Set<string>;
   budgetUsed: number;
   score: number;
@@ -21,9 +18,7 @@ export interface CityData {
   station: string; bookingId: string; destType: string; taLocationId: string;
 }
 
-// =========================================================================
-// CITY REGISTRY
-// =========================================================================
+
 export const CITY_REGISTRY: Record<string, CityData> = {
   "Surabaya":   { lat: -7.2575,  lon: 112.7521, province: "Jawa Timur",  iata: "SUB", station: "SGU",  bookingId: "-2698521", destType: "city",   taLocationId: "297710" },
   "Jakarta":    { lat: -6.2088,  lon: 106.8456, province: "DKI Jakarta", iata: "CGK", station: "GMR",  bookingId: "-2679652", destType: "city",   taLocationId: "297715" },
