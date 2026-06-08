@@ -5,9 +5,7 @@ import { estimateTotalCost, calcCostBreakdown }                                 
 import { getTransportMode, fetchRealTransportPrice }                                      from "@/lib/weightedScore/transport";
 import { fetchOpenTripMapPOIs }                                                           from "@/lib/estimateTransportCost/poi";
 
-// =========================================================================
-// UTILS
-// =========================================================================
+
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 function formatDateLocal(date: Date): string {
@@ -17,9 +15,7 @@ function formatDateLocal(date: Date): string {
   return `${d.getFullYear()}-${month}-${day}`;
 }
 
-// =========================================================================
-// MAIN ROUTE HANDLER
-// =========================================================================
+
 export async function POST(req: Request) {
   console.log("\n================ MULAI GENERATE ITINERARY ================");
 
@@ -42,9 +38,7 @@ export async function POST(req: Request) {
       .sort(() => 0.5 - Math.random())
       .slice(0, 5);
 
-    // ===================================================================
-    // STEP 1 — Fetch Hotel dari Booking.com
-    // ===================================================================
+
     const rawAccommodations: any[] = [];
 
     for (const cityName of shuffledCities) {
@@ -91,9 +85,7 @@ export async function POST(req: Request) {
       await delay(1000);
     }
 
-    // ===================================================================
-    // STEP 2 — Modul 1: Hash Indexing
-    // ===================================================================
+
     const hashBuckets: Record<number, any[]> = {};
     rawAccommodations.forEach(item => {
       const bucket = formulaHash(item.name);
@@ -102,9 +94,7 @@ export async function POST(req: Request) {
     });
     const indexedItems = Object.values(hashBuckets).flat();
 
-    // ===================================================================
-    // STEP 3 — Modul 2: Weighted Scoring + filter budget
-    // ===================================================================
+
     const origin = CITY_REGISTRY[originCity] ?? CITY_REGISTRY["Surabaya"];
 
     const scoredItems = indexedItems.map(item => {
@@ -126,14 +116,14 @@ export async function POST(req: Request) {
       };
     });
 
-    // Hard filter: hanya yang masuk budget
+   
     const affordableItems = scoredItems.filter(item => item.grandTotalEst <= budget);
 
     console.log("[DEBUG] Budget:", budget);
     console.log("[DEBUG] scoredItems:", scoredItems.map(i => ({ name: i.name, city: i.city, grandTotalEst: i.grandTotalEst })));
     console.log("[DEBUG] affordableItems:", affordableItems.length);
 
-    // Kalau tidak ada yang muat → kembalikan error dengan saran
+   
     if (affordableItems.length === 0) {
       const cheapest      = [...scoredItems].sort((a, b) => a.grandTotalEst - b.grandTotalEst)[0];
       const minBudgetNeeded = cheapest?.grandTotalEst ?? 0;
@@ -149,18 +139,14 @@ export async function POST(req: Request) {
 
     const primarySelection = [...affordableItems].sort((a, b) => b.finalScore - a.finalScore)[0];
 
-    // ===================================================================
-    // STEP 4 — Hitung biaya aktual
-    // ===================================================================
+
     const transport     = getTransportMode(primarySelection.distanceKm);
     const transportCost = Math.floor(
       await fetchRealTransportPrice(transport.mode, originCity, primarySelection.city, checkinDate, API_KEY, primarySelection.distanceKm)
     );
     const { hotelCost, foodCost, ticketCost } = calcCostBreakdown(primarySelection, transportCost, totalDays);
 
-    // ===================================================================
-    // STEP 5 — Modul 3: Fetch POI + A* Itinerary
-    // ===================================================================
+
     const realPOIs = await fetchOpenTripMapPOIs(
       primarySelection.city,
       primarySelection.lat,
@@ -234,9 +220,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // ===================================================================
-    // STEP 6 — Modul 4: Cosine Similarity untuk alternatif
-    // ===================================================================
+
     const mainVec = [primarySelection.nBudget, primarySelection.nTag, primarySelection.nDist];
     const sortedAlternatives = scoredItems
       .filter(d => d.id !== primarySelection.id)
