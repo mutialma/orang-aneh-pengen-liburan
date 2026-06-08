@@ -145,6 +145,33 @@ export default function PlannerPage() {
           </div>
 
           <div className="p-6 space-y-6">
+
+
+           {/* Ganti Algoritma */}
+            <div className="bg-sky-50 rounded-2xl p-4 border border-sky-100">
+              <p className="text-xs font-bold text-sky-700 mb-3"> Aktif: UCS Ganti algoritma?</p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { href: "/planner",     label: "Beam Search"  },
+                  { href: "/planner_ucs", label: "UCS",   active: true    },
+                  { href: "/planner_bfs", label: "BFS"          },
+                ].map(algo => (
+                  <a
+                    key={algo.href}
+                    href={algo.href}
+                    className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-xs font-bold transition text-center ${
+                      algo.active
+                        ? "gradient-bg text-white border-transparent shadow-md shadow-sky-200"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-sky-300"
+                    }`}
+                  >
+                    <span className="text-lg">{algo.emoji}</span>
+                    {algo.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+
             {/* Kota Asal */}
             <div>
               <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3">
